@@ -3,9 +3,9 @@
 > **A Multi-Agent AI Research System** — Four specialized AI agents collaborate (Search, Read, Write, Critique) to deliver polished, citation-backed research reports on any topic.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.30+-red.svg)](https://streamlit.io)
-[![LangChain](https://img.shields.io/badge/LangChain-0.2+-green.svg)](https://langchain.com)
-[![Groq](https://img.shields.io/badge/Groq-LLM-orange.svg)](https://groq.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.54+-red.svg)](https://streamlit.io)
+[![LangChain](https://img.shields.io/badge/LangChain-1.4+-green.svg)](https://langchain.com)
+[![Google Gemini](https://img.shields.io/badge/AI-Gemini%203.1%20Flash-blue)](https://ai.google.dev)
 
 ---
 
@@ -17,11 +17,13 @@ ResearchMind is an autonomous research pipeline built with **LangChain** and **S
 |-------|------|-------|
 | **Search Agent** | Finds recent, reliable web sources | Tavily Search API |
 | **Reader Agent** | Scrapes & extracts deep content from top URLs | BeautifulSoup + Requests |
-| **Writer Chain** | Synthesizes research into structured reports | Groq LLM (GPT-OSS-20B) |
-| **Critic Chain** | Reviews, scores & improves the report | Groq LLM (GPT-OSS-20B) |
+| **Writer Chain** | Synthesizes research into structured reports | Google Gemini (gemini-3.1-flash-lite) |
+| **Critic Chain** | Reviews, scores & improves the report | Google Gemini (gemini-3.1-flash-lite) |
 
 The system produces a **complete research report** with:
-- Introduction & Key Findings (minimum 3 detailed points)
+- Introduction & Key Findings (minimum 4 detailed points)
+- Methodology
+- Analysis & Discussion (including Limitations and Counterarguments)
 - Conclusion
 - Source citations (all URLs discovered)
 - **Critic feedback** with score (X/10), strengths, areas to improve, and verdict
@@ -35,7 +37,7 @@ The system produces a **complete research report** with:
 - 📄 **Deep Content Extraction** — Scrapes full article content for nuanced understanding
 - 🎨 **Beautiful Streamlit UI** — Dark theme, animated pipeline visualization, expandable raw outputs
 - 📥 **Export Reports** — Download finished reports as Markdown files
-- ⚡ **Fast Inference** — Powered by Groq's LPU for near-instant LLM responses
+- ⚡ **Fast Inference** — Powered by Google Gemini for responsive LLM responses
 - 🐳 **Dev Container Ready** — One-click GitHub Codespaces / VS Code Remote Containers support
 
 ---
@@ -76,7 +78,7 @@ The system produces a **complete research report** with:
 ## Project Structure
 
 ```
-Multi-agent-research/
+researchmind/
 ├── .devcontainer/              # Dev container configuration
 │   └── devcontainer.json       # VS Code / Codespaces setup
 ├── .venv/                      # Python virtual environment (gitignored)
@@ -108,7 +110,7 @@ Multi-agent-research/
 ### Prerequisites
 
 - **Python 3.11+**
-- **Groq API Key** — Get free at [console.groq.com](https://console.groq.com)
+- **Google API Key** — Get at [ai.google.dev](https://ai.google.dev)
 - **Tavily API Key** — Get free at [tavily.com](https://tavily.com)
 
 ### Installation
@@ -116,7 +118,7 @@ Multi-agent-research/
 ```bash
 # 1. Clone the repository
 git clone <your-repo-url>
-cd Multi-agent-research
+cd researchmind
 
 # 2. Create virtual environment
 python -m venv .venv
@@ -142,13 +144,13 @@ cp .env.example .env
 Edit `.env` with your API keys:
 
 ```env
-GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_API_KEY=your_gemini_api_key_here
 TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GROQ_API_KEY` | ✅ Yes | Groq API key for LLM inference (GPT-OSS-20B) |
+| `GOOGLE_API_KEY` | ✅ Yes | Google API key for Gemini LLM inference (gemini-3.1-flash-lite) |
 | `TAVILY_API_KEY` | ✅ Yes | Tavily API key for web search |
 
 ---
@@ -227,16 +229,25 @@ step 3 - Writer is drafting the report ...
  Final Report
  # Quantum Computing Error Correction: 2024 Breakthroughs
 
+ ## Executive Summary
+ ...
+
  ## Introduction
+ ...
+
+ ## Methodology
  ...
 
  ## Key Findings
  ...
 
+ ## Analysis & Discussion
+ ...
+
  ## Conclusion
  ...
 
- ## Sources
+ ## References
  - https://example.com/quantum-ec
  ...
 
@@ -245,13 +256,25 @@ step 4 - critic is reviewing the report
 ==================================================
 
  critic report
- Score: 8/10
+ Overall Score: 8/10
 
- Strengths:
+ Evidence & Citations:
  - Comprehensive coverage of recent breakthroughs
  - Clear structure with citations
 
- Areas to Improve:
+ Structure & Logic:
+ - ...
+
+ Analysis & Synthesis:
+ - ...
+
+ Transparency / Limitations:
+ - ...
+
+ Presentation:
+ - ...
+
+ Critical Gaps (must address before publication):
  - Could include more technical depth on surface codes
  - Add timeline of developments
 
@@ -292,29 +315,29 @@ The project includes a complete dev container setup:
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `langchain` | ≥0.2.0 | Agent orchestration framework |
-| `langchain-core` | ≥0.2.0 | Core LangChain abstractions |
-| `langchain-community` | ≥0.2.0 | Community integrations |
-| `langchain-groq` | ≥0.1.0 | Groq LLM integration |
-| `streamlit` | ≥1.30.0 | Web UI framework |
-| `tavily-python` | ≥0.3.0 | Web search API client |
-| `beautifulsoup4` | ≥4.12.0 | HTML parsing for scraping |
-| `requests` | ≥2.31.0 | HTTP requests |
-| `lxml` | ≥5.0.0 | Fast XML/HTML parser |
+| `langchain` | ≥1.4.0 | Agent orchestration framework |
+| `langchain-core` | ≥1.6.0 | Core LangChain abstractions |
+| `langchain-community` | ≥0.4.0 | Community integrations |
+| `langchain-google-genai` | ≥4.4.0 | Google Gemini LLM integration |
+| `streamlit` | ≥1.54.0 | Web UI framework |
+| `tavily-python` | ≥0.8.0 | Web search API client |
+| `beautifulsoup4` | ≥4.14.0 | HTML parsing for scraping |
+| `requests` | ≥2.32.0 | HTTP requests |
+| `lxml` | ≥6.1.0 | Fast XML/HTML parser |
 | `python-dotenv` | ≥1.0.0 | Environment variable loading |
-| `rich` | ≥13.7.0 | Rich terminal output (CLI) |
-| `pydantic` | ≥2.5.0 | Data validation |
-| `tenacity` | ≥8.2.0 | Retry logic for API calls |
+| `rich` | ≥15.0.0 | Rich terminal output (CLI) |
+| `pydantic` | ≥2.13.0 | Data validation |
+| `tenacity` | ≥9.1.0 | Retry logic for API calls |
 
 ---
 
 ## 🔐 API Keys Setup
 
-### Groq API Key
-1. Go to [console.groq.com](https://console.groq.com)
+### Google API Key
+1. Go to [ai.google.dev](https://ai.google.dev)
 2. Sign up / log in
 3. Create API Key
-4. Model used: `openai/gpt-oss-20b` (free, fast)
+4. Model used: `gemini-3.1-flash-lite` (fast, cost-effective)
 
 ### Tavily API Key
 1. Go to [tavily.com](https://tavily.com)
@@ -328,18 +351,18 @@ The project includes a complete dev container setup:
 | Issue | Solution |
 |-------|----------|
 | `ModuleNotFoundError` | Run `pip install -r requirements.txt` in activated venv |
-| `GROQ_API_KEY not set` | Check `.env` file exists and has correct key |
+| `GOOGLE_API_KEY not set` | Check `.env` file exists and has correct key |
 | `TAVILY_API_KEY not set` | Same as above for Tavily |
 | Streamlit won't start | Ensure port 8501 is free: `streamlit run app.py --server.port 8502` |
 | Scraping fails | Some sites block bots; the tool handles errors gracefully |
-| Slow responses | Groq free tier has rate limits; wait or upgrade |
+| Slow responses | Check network and API rate limits |
 
 ---
 
 ## Acknowledgments
 
 - **LangChain** — Agent orchestration framework
-- **Groq** — Ultra-fast LLM inference
+- **Google Gemini** — LLM inference for writer and critic chains
 - **Tavily** — Real-time web search API
 - **Streamlit** — Beautiful data apps in pure Python
 - **BeautifulSoup** — HTML parsing made easy
