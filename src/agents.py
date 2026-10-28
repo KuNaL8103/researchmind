@@ -2,25 +2,33 @@ from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from tools import web_search, scrape_url
+from .tools import web_search, scrape_url
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
-# Model setup using Gemini
-llm = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite",
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
-    vertexai=False,
-    temperature=0,
-)
+# Model setup is lazy so the API can start (and serve /health) without keys.
+_llm = None
+
+
+def get_llm():
+    """Create the shared Gemini chat model on first use."""
+    global _llm
+    if _llm is None:
+        _llm = ChatGoogleGenerativeAI(
+            model="gemini-3.5-flash-lite",
+            google_api_key=os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"),
+            vertexai=False,
+            temperature=0,
+        )
+    return _llm
 
 
 # 1st agent
 def build_search_agent():
     return create_agent(
-        model=llm,
+        model=get_llm(),
         tools=[web_search]
     )
 
@@ -28,7 +36,7 @@ def build_search_agent():
 # 2nd agent
 def build_reader_agent():
     return create_agent(
-        model=llm,
+        model=get_llm(),
         tools=[web_search, scrape_url]
     )
 
@@ -38,7 +46,7 @@ writer_prompt = ChatPromptTemplate.from_messages([
 
 NON-NEGOTIABLE RULES
 1. GROUNDING: Use ONLY the information in the provided research. Never invent statistics, quotes, studies, organizations, dates, or URLs. If the research doesn't support a claim, either omit it or label it explicitly as "[Analyst inference]".
-2. CITATIONS: Cite every factual claim inline with numeric markers, e.g. [1], [2]. Each marker must map to a source in the References section. Never cite a source that is not in the research.
+2. CITATIONS: Cite every factual claim inline with numeric markers, e.g. [1], [2]. Marker [N] must map to the retrieved evidence labeled [SOURCE N] and to a source in the References section. Each unique URL has exactly one [SOURCE N] number; multiple excerpts from the same URL share that number. Never cite a URL that is not explicitly present in the research.
 3. CALIBRATION: Distinguish clearly between established facts, single-source claims, and contested or uncertain claims. Use hedged language ("suggests", "indicates") for weak evidence and firm language only for well-corroborated evidence.
 4. HONESTY ABOUT GAPS: If the research is thin, one-sided, outdated, or contradictory on a point, say so. Never pad or fill gaps with generic filler.
 5. TONE: Objective, precise, third-person, no marketing language, no rhetorical flourishes, no first-person ("I", "we").
@@ -48,7 +56,7 @@ NON-NEGOTIABLE RULES
 
 TOPIC: {topic}
 
-RESEARCH GATHERED (each source is labeled; use these as your only evidence base):
+RESEARCH GATHERED (retrieved evidence is labeled [SOURCE N] with its URL; use these as your only evidence base):
 {research}
 
 REQUIRED STRUCTURE (use these exact headings, in this order):
@@ -90,6 +98,8 @@ REQUIRED STRUCTURE (use these exact headings, in this order):
 ## 7. References
 - Numbered list matching the inline citation markers.
 - Format: [N] Title or description. Publisher/Author (date if known). URL
+- Exactly one reference entry per unique URL; do not repeat the same URL under multiple numbers.
+- Copy URLs exactly from the [SOURCE N] labels or search results provided above; never invent or rewrite a URL.
 - Add a one-line annotation on what each source contributed and its reliability/type.
 - Include only sources that appear in the research above.
 
@@ -108,7 +118,8 @@ BEFORE FINALIZING, silently verify:
 Output only the final report."""),
 ])
 
-writer_chain = writer_prompt | llm | StrOutputParser()
+def build_writer_chain():
+    return writer_prompt | get_llm() | StrOutputParser()
 
 # Critic chain
 critic_prompt = ChatPromptTemplate.from_messages([
@@ -157,4 +168,16 @@ One-line verdict:
 ..."""),
 ])
 
-critic_chain = critic_prompt | llm | StrOutputParser()
+def build_critic_chain():
+    return critic_prompt | get_llm() | StrOutputParser()
+
+
+def __getattr__(name):
+    """Backwards-compatible lazy aliases for the old module-level objects."""
+    if name == "llm":
+        return get_llm()
+    if name == "writer_chain":
+        return build_writer_chain()
+    if name == "critic_chain":
+        return build_critic_chain()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

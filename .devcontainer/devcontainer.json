@@ -23,11 +23,16 @@
   },
   "portsAttributes": {
     "8501": {
-      "label": "Application",
+      "label": "ResearchMind UI",
       "onAutoForward": "openPreview"
+    },
+    "8000": {
+      "label": "ResearchMind API",
+      "onAutoForward": "notify"
     }
   },
   "forwardPorts": [
-    8501
+    8501,
+    8000
   ]
 }

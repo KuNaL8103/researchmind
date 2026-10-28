@@ -1,0 +1,26 @@
+{
+  "mode": "token-only",
+  "timestamp": "2026-10-28T09:30:21.195627+00:00",
+  "topic": "large language model agents",
+  "urls": [
+    "https://en.wikipedia.org/wiki/Large_language_model",
+    "https://en.wikipedia.org/wiki/Quantum_error_correction",
+    "https://en.wikipedia.org/wiki/Fusion_energy",
+    "https://en.wikipedia.org/wiki/CRISPR_gene_editing"
+  ],
+  "chunk_size": 1000,
+  "chunk_overlap": 150,
+  "top_k": 5,
+  "runs": 3,
+  "raw_tokens": 19862,
+  "retrieved_tokens": 1192,
+  "reduction_pct": 94.0,
+  "reduction_range_pct": [
+    94.0,
+    94.0
+  ],
+  "chunks_indexed": 95,
+  "retrieved_chunks": 5,
+  "local_rag_seconds_avg": 0.976,
+  "note": "Offline deterministic embeddings are used to select top-k chunks; token counts use cl100k_base and production chunk settings (1000/150). Latency is local chunk+embed+retrieve overhead, not LLM/network latency."
+}

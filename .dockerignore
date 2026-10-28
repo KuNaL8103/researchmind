@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.env
+.streamlit
+logs
+.pytest_cache
+tests/__pycache__
+.devcontainer
+README.md
+INTERVIEW_GUIDE.md
+benchmarks

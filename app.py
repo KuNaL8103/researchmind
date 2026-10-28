@@ -1,6 +1,9 @@
-import streamlit as st
+import json
 import time
-from agents import build_reader_agent, build_search_agent, writer_chain, critic_chain
+
+import streamlit as st
+
+from src.pipeline import run_research_pipeline
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -277,6 +280,42 @@ details summary {
     margin: 2rem 0 1rem;
 }
 
+/* ── Metrics row ── */
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.8rem;
+    margin: 1rem 0 1.5rem;
+}
+.metric-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,140,50,0.16);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+}
+.metric-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #f0ebe0;
+    line-height: 1.1;
+}
+.metric-value.green { color: #50c878; }
+.metric-value.orange { color: #ff8c32; }
+.metric-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #a09890;
+    margin-top: 0.45rem;
+}
+.metric-sub {
+    font-size: 0.72rem;
+    color: #706860;
+    margin-top: 0.25rem;
+}
+
 /* ── Toast-style notice ── */
 .notice {
     font-family: 'DM Mono', monospace;
@@ -288,6 +327,114 @@ details summary {
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ── Helper: render quantitative metrics ──────────────────────────────────────
+def render_metrics(metrics: dict, evaluation: dict):
+    latency = metrics.get("latency_seconds") or 0
+    reduction = metrics.get("token_reduction_pct") or 0
+    saved = metrics.get("tokens_saved") or 0
+    chunks = metrics.get("chunks_indexed") or 0
+    retrieved = metrics.get("retrieved_chunks") or 0
+    retrieved_sources = metrics.get("retrieved_sources") or 0
+    critic = evaluation.get("critic_score")
+    grounded = evaluation.get("groundedness_score") or 0
+    verdict = evaluation.get("verdict", "Not evaluated")
+    sources = metrics.get("sources_scraped") or 0
+
+    grounded_cls = "green" if grounded >= 0.6 else "orange"
+    critic_text = f"{critic:g}/10" if critic is not None else "—"
+
+    st.markdown(f"""
+    <div class="metric-grid">
+        <div class="metric-card">
+            <div class="metric-value">{latency:.1f}s</div>
+            <div class="metric-label">Pipeline Latency</div>
+            <div class="metric-sub">end-to-end wall clock</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value green">{reduction:.1f}%</div>
+            <div class="metric-label">Token Reduction</div>
+            <div class="metric-sub">{saved:,} tokens saved by RAG</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value orange">{critic_text}</div>
+            <div class="metric-label">Critic Score</div>
+            <div class="metric-sub">1–10 publication review</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value {grounded_cls}">{grounded * 100:.0f}%</div>
+            <div class="metric-label">Groundedness</div>
+            <div class="metric-sub">{verdict}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{retrieved}/{chunks}</div>
+            <div class="metric-label">Chunks Retrieved</div>
+            <div class="metric-sub">{retrieved_sources} unique URLs · {sources} scraped</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.expander("📊 Evaluation & telemetry details", expanded=False):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("**Stage latency (seconds)**")
+            stages = metrics.get("stage_latency_seconds") or {}
+            if stages:
+                for stage, seconds in stages.items():
+                    st.markdown(f"- `{stage}` — {seconds:.3f}s")
+            else:
+                st.caption("No stage timings recorded.")
+
+            st.markdown("**RAG configuration**")
+            st.markdown(
+                f"- Embedding: `{metrics.get('embedding_provider') or 'n/a'}` / "
+                f"`{metrics.get('embedding_model') or 'n/a'}`\n"
+                f"- Chunk size: `{metrics.get('chunk_size')}` · overlap: "
+                f"`{metrics.get('chunk_overlap')}` · top-k: `{metrics.get('top_k')}`\n"
+                f"- Retrieval: `{metrics.get('retrieval_mode', 'diversified')}` · "
+                f"max `{metrics.get('max_chunks_per_source', 2)}` chunks/URL\n"
+                f"- Embedding batches: `{metrics.get('embedding_batches', 0)}` · "
+                f"embed time: `{metrics.get('embedding_seconds', 0):.2f}s`\n"
+                f"- Chunks indexed: `{chunks}` · duplicates removed: "
+                f"`{metrics.get('chunks_deduplicated', 0)}`"
+            )
+            if metrics.get("rag_error"):
+                st.warning(f"RAG fallback used: {metrics['rag_error']}")
+
+        with col_b:
+            st.markdown("**Token accounting**")
+            st.markdown(
+                f"- Raw scraped text: `{metrics.get('raw_scraped_tokens', 0):,}` tokens\n"
+                f"- Full-context baseline: `{metrics.get('baseline_context_tokens', 0):,}` tokens\n"
+                f"- RAG writer context: `{metrics.get('optimized_context_tokens', 0):,}` tokens\n"
+                f"- Saved: `{saved:,}` tokens ({reduction:.1f}%)"
+            )
+
+            st.markdown("**Citation / groundedness check**")
+            st.markdown(
+                f"- References: `{evaluation.get('reference_count', 0)}` · "
+                f"verified URLs: `{len(evaluation.get('verified_urls', []))}`\n"
+                f"- Citation precision: `{(evaluation.get('citation_precision') or 0) * 100:.0f}%` · "
+                f"claim coverage: `{(evaluation.get('claim_coverage') or 0) * 100:.0f}%`\n"
+                f"- Retrieved-URL coverage: `{(evaluation.get('retrieved_url_coverage') or 0) * 100:.0f}%` · "
+                f"uncited findings: `{evaluation.get('uncited_claim_count', 0)}`\n"
+                f"- Check: `{'PASS' if evaluation.get('passed') else 'REVIEW'}`"
+            )
+            unsupported = evaluation.get("unsupported_urls") or []
+            if unsupported:
+                st.error("Unsupported reference URLs:\n" + "\n".join(f"- {url}" for url in unsupported))
+            for note in evaluation.get("notes") or []:
+                st.caption(note)
+
+        st.download_button(
+            "⬇  Download metrics (.json)",
+            data=json.dumps(
+                {"metrics": metrics, "evaluation": evaluation}, indent=2
+            ),
+            file_name=f"research_metrics_{int(time.time())}.json",
+            mime="application/json",
+        )
 
 
 # ── Helper: render a step card ────────────────────────────────────────────────
@@ -315,6 +462,7 @@ def step_card(num: str, title: str, state: str, desc: str = ""):
 for key in ("results", "running", "done"):
     if key not in st.session_state:
         st.session_state[key] = {} if key == "results" else False
+st.session_state.setdefault("error", None)
 
 
 # ── Hero ──────────────────────────────────────────────────────────────────────
@@ -376,8 +524,6 @@ with col_pipeline:
         if not r:
             return "waiting"
         steps = ["search", "reader", "writer", "critic"]
-        idx = steps.index(step)
-        completed = list(r.keys())
         # figure out which steps are done
         if step in r:
             return "done"
@@ -389,9 +535,9 @@ with col_pipeline:
         return "waiting"
 
     step_card("01", "Search Agent",  s("search"), "Gathers recent web information")
-    step_card("02", "Reader Agent",  s("reader"), "Scrapes & extracts deep content")
-    step_card("03", "Writer Chain",  s("writer"), "Drafts the full research report")
-    step_card("04", "Critic Chain",  s("critic"), "Reviews & scores the report")
+    step_card("02", "Reader Agent",  s("reader"), "Scrapes sources & builds ChromaDB index")
+    step_card("03", "Writer Chain",  s("writer"), "Retrieves top-k evidence & drafts the report")
+    step_card("04", "Critic Chain",  s("critic"), "Reviews, scores & citation-checks the report")
 
 
 # ── Run pipeline ──────────────────────────────────────────────────────────────
@@ -402,53 +548,69 @@ if run_btn:
         st.session_state.results = {}
         st.session_state.running = True
         st.session_state.done = False
+        st.session_state.error = None
         st.rerun()
 
 if st.session_state.running and not st.session_state.done:
-    results = {}
     topic_val = st.session_state.topic_input
+    stage_meta = {
+        "search": ("🔍", "Search agent"),
+        "read": ("📄", "Reader + scraping"),
+        "rag": ("🧩", "ChromaDB indexing"),
+        "write": ("✍️", "Writer"),
+        "critic": ("🧐", "Critic"),
+    }
 
-    # ── Step 1: Search ──
-    with st.spinner("🔍  Search Agent is working…"):
-        search_agent = build_search_agent()
-        sr = search_agent.invoke({
-            "messages": [("user", f"Find recent, reliable and detailed information about: {topic_val}")]
-        })
-        results["search"] = sr["messages"][-1].content
-        st.session_state.results = dict(results)
-    st.rerun() if False else None   # keep inline for now
+    try:
+        with st.status("⚡ Running the 4-stage research pipeline…", expanded=True) as status:
+            def on_stage(stage: str, event: str, detail: dict):
+                icon, label = stage_meta.get(stage, ("•", stage.title()))
+                if event == "running":
+                    status.write(f"{icon} **{label}** — running…")
+                elif event == "done":
+                    if stage == "rag":
+                        status.write(
+                            f"{icon} **{label}** — {detail.get('chunks', 0)} chunks · "
+                            f"top-{detail.get('retrieved', 0)} retrieved via "
+                            f"{detail.get('provider', 'n/a')}"
+                        )
+                    elif stage == "read":
+                        status.write(
+                            f"{icon} **{label}** — {detail.get('sources', 0)} sources · "
+                            f"{detail.get('chars', 0):,} chars"
+                        )
+                    elif stage == "search":
+                        status.write(
+                            f"{icon} **{label}** — {detail.get('urls', 0)} candidate URLs"
+                        )
+                    else:
+                        status.write(f"{icon} **{label}** — done")
+                elif event == "error":
+                    status.write(f"⚠️ **{label}** — {detail.get('error', 'failed')}")
 
-    # ── Step 2: Reader ──
-    with st.spinner("📄  Reader Agent is scraping top resources…"):
-        reader_agent = build_reader_agent()
-        rr = reader_agent.invoke({
-            "messages": [("user",
-                f"Based on the following search results about '{topic_val}', "
-                f"pick the most relevant URL and scrape it for deeper content.\n\n"
-                f"Search Results:\n{results['search'][:800]}"
-            )]
-        })
-        results["reader"] = rr["messages"][-1].content
-        st.session_state.results = dict(results)
+            state = run_research_pipeline(
+                topic_val,
+                max_sources=4,
+                top_k=5,
+                verbose=False,
+                on_stage=on_stage,
+            )
+            status.update(label="✓ Research complete", state="complete", expanded=False)
 
-    # ── Step 3: Writer ──
-    with st.spinner("✍️  Writer is drafting the report…"):
-        research_combined = (
-            f"SEARCH RESULTS:\n{results['search']}\n\n"
-            f"DETAILED SCRAPED CONTENT:\n{results['reader']}"
-        )
-        results["writer"] = writer_chain.invoke({
-            "topic": topic_val,
-            "research": research_combined
-        })
-        st.session_state.results = dict(results)
-
-    # ── Step 4: Critic ──
-    with st.spinner("🧐  Critic is reviewing the report…"):
-        results["critic"] = critic_chain.invoke({
-            "report": results["writer"]
-        })
-        st.session_state.results = dict(results)
+        st.session_state.results = {
+            "search": state["search_results"],
+            "reader": state["scraped_content"],
+            "writer": state["report"],
+            "critic": state["feedback"],
+            "metrics": state.get("metrics", {}),
+            "evaluation": state.get("evaluation", {}),
+            "sources": state.get("sources", []),
+            "retrieved_chunks": state.get("retrieved_chunks", []),
+        }
+        st.session_state.error = None
+    except Exception as exc:
+        st.session_state.results = {}
+        st.session_state.error = str(exc)
 
     st.session_state.running = False
     st.session_state.done = True
@@ -458,9 +620,15 @@ if st.session_state.running and not st.session_state.done:
 # ── Results display ───────────────────────────────────────────────────────────
 r = st.session_state.results
 
+if st.session_state.get("error"):
+    st.error(f"Pipeline failed: {st.session_state.error}")
+
 if r:
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-heading">Results</div>', unsafe_allow_html=True)
+
+    if r.get("metrics"):
+        render_metrics(r["metrics"], r.get("evaluation") or {})
 
     # Raw outputs in expanders
     if "search" in r:
@@ -472,6 +640,24 @@ if r:
         with st.expander("📄 Scraped Content (raw)", expanded=False):
             st.markdown(f'<div class="result-panel"><div class="result-panel-title">Reader Agent Output</div>'
                         f'<div class="result-content">{r["reader"]}</div></div>', unsafe_allow_html=True)
+
+    if r.get("retrieved_chunks"):
+        with st.expander("🔎 Retrieved Evidence (ChromaDB top-k)", expanded=False):
+            for index, chunk in enumerate(r["retrieved_chunks"], start=1):
+                st.markdown(
+                    f"**[{index}] {chunk.get('title') or chunk.get('url') or 'Source'}**  \n"
+                    f"`{chunk.get('url') or 'n/a'}` · relevance `{chunk.get('score', 0):.3f}`"
+                )
+                st.caption(chunk.get("content", "")[:800])
+
+    if r.get("sources"):
+        with st.expander("🌐 Sources", expanded=False):
+            for source in r["sources"]:
+                state_label = "scraped" if source.get("ok") else "failed"
+                st.markdown(
+                    f"- **{source.get('title') or source.get('url') or 'Untitled'}**  \n"
+                    f"  `{source.get('url') or 'n/a'}` · {source.get('char_count', 0):,} chars · {state_label}"
+                )
 
     # Final report
     if "writer" in r:

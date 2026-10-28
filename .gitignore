@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 .streamlit/
+logs/
+.chroma/
+.ruff_cache/
+.pytest_cache/
