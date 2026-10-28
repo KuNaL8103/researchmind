@@ -98,7 +98,6 @@ researchmind/
 ├── tests/                      # 🧪 Offline unit tests
 ├── Dockerfile                  # 🐳 API container image
 ├── requirements.txt            # 📦 Python dependencies (+ optional local embeddings)
-├── INTERVIEW_GUIDE.md          # 📖 Architecture, benchmarks and interview notes
 ├── README.md
 ├── .env.example                # Template for environment variables
 └── .gitignore
@@ -375,7 +374,7 @@ python benchmarks/benchmark.py --token-only --runs 3 --topic "large language mod
 python benchmarks/benchmark.py --runs 3 --topic "LLM agents 2026"
 ```
 
-The offline run writes `benchmarks/token_benchmark.json`; the full run writes `benchmarks/latest.json`. See **[INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md)** for architecture details, metric definitions, and the measured token-reduction numbers.
+The offline run writes `benchmarks/token_benchmark.json`; the full run writes `benchmarks/latest.json`.
 
 ---
 
