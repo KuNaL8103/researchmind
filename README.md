@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.54+-red.svg)](https://streamlit.io)
 [![LangChain](https://img.shields.io/badge/LangChain-1.4+-green.svg)](https://langchain.com)
-[![Google Gemini](https://img.shields.io/badge/AI-Gemini%203.1%20Flash-blue)](https://ai.google.dev)
+[![Google Gemini](https://img.shields.io/badge/AI-Gemini%203.5%20Flash%20Lite-blue)](https://ai.google.dev)
 
 ---
 
