@@ -1,6 +1,6 @@
 # ResearchMind 🔬
 
-> **A Multi-Agent AI Research System** — Four specialized AI agents collaborate (Search, Read, Write, Critique) to deliver polished, citation-backed research reports on any topic.
+> **A Multi-Stage AI Research Pipeline** — Search and Reader agents gather evidence; Writer and Critic chains turn it into a structured, citation-backed research report.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.54+-red.svg)](https://streamlit.io)
@@ -11,36 +11,37 @@
 
 ## 📖 Overview
 
-ResearchMind is an autonomous research pipeline built with **LangChain**, **ChromaDB**, and **Streamlit** that orchestrates four specialized AI agents to conduct deep research on any topic:
+ResearchMind is an autonomous research pipeline built with **LangChain**, **ChromaDB**, and **Streamlit**. It runs a four-stage workflow — Search, Read, Write, Critique — using two tool-using agents, two LLM chains, and a deterministic retrieval/evaluation layer:
 
-| Agent | Role | Tools |
-|-------|------|-------|
+| Component | Role | Tools / Notes |
+|-----------|------|---------------|
 | **Search Agent** | Finds recent, reliable web sources | Tavily Search API |
 | **Reader Agent** | Scrapes & extracts deep content from top URLs | BeautifulSoup + Requests |
 | **RAG Layer** | Chunks scraped pages and retrieves the top-5 evidence chunks | ChromaDB + Gemini/HuggingFace embeddings |
-| **Writer Chain** | Synthesizes retrieved evidence into structured reports | Google Gemini (gemini-3.1-flash-lite) |
-| **Critic Chain** | Reviews, scores & citation-checks the report | Google Gemini (gemini-3.1-flash-lite) |
+| **Writer Chain** | Synthesizes retrieved evidence into structured reports | Google Gemini (`gemini-3.5-flash-lite`) |
+| **Critic Chain** | Reviews and scores the report; does not receive the source set | Google Gemini (`gemini-3.5-flash-lite`) |
+| **Evaluation Layer** | Deterministic citation checks: URL allowlist, claim coverage, structural citation heuristic | `src/evaluation.py` |
 
 The system produces a **complete research report** with:
 - Introduction & Key Findings (minimum 4 detailed points)
 - Methodology
 - Analysis & Discussion (including Limitations and Counterarguments)
 - Conclusion
-- Source citations (all URLs discovered)
+- Source citations, with URL allowlist checks against the retrieved evidence
 - **Critic feedback** with score (X/10), strengths, areas to improve, and verdict
 
 ---
 
 ## Features
 
-- 🤖 **Multi-Agent Pipeline** — Four agents work in sequence, each building on the previous agent's output
+- 🤖 **Multi-Stage Pipeline** — Search and Reader agents run first; Writer and Critic chains build on the retrieved evidence
 - 🧩 **Vector RAG (ChromaDB)** — Scraped pages are chunked (1,000/150) and embedded; the writer receives only the top-5 semantically relevant chunks with source URLs
-- 📊 **Quantitative Telemetry** — End-to-end and per-stage latency, token reduction vs. a full-context baseline, critic score, and citation groundedness
+- 📊 **Run Metrics** — End-to-end and per-stage latency, token reduction vs. a full-context baseline, critic score, and structural citation checks
 - 🔍 **Real-time Web Search** — Uses Tavily API for current, reliable information
 - 📄 **Deep Content Extraction** — Scrapes full article content for nuanced understanding
 - 🎨 **Beautiful Streamlit UI** — Dark theme, live pipeline status, metrics row, expandable sources and retrieved chunks
 - 📥 **Export Reports** — Download finished reports as Markdown files and metrics as JSON
-- 🚀 **FastAPI + Docker** — Pydantic-typed `POST /research` endpoint with a production-style container image
+- 🚀 **FastAPI + Docker** — Pydantic-typed `POST /research` endpoint with a containerized API image
 - ⚡ **Fast Inference** — Powered by Google Gemini for responsive LLM responses
 - 🐳 **Dev Container Ready** — One-click GitHub Codespaces / VS Code Remote Containers support
 
@@ -66,11 +67,11 @@ The system produces a **complete research report** with:
 │                                                     ▼                │
 │  ┌──────────────┐    ┌──────────────┐    ┌───────────────────────┐   │
 │  │ EVALUATION & │◀───│ CRITIC CHAIN │◀───│ WRITER CHAIN          │   │
-│  │ TELEMETRY    │    │              │    │                       │   │
+│  │ RUN METRICS  │    │              │    │                       │   │
 │  │              │    │ • Score X/10 │    │ • Uses retrieved      │   │
 │  │ • Latency    │    │ • Strengths  │    │   evidence only       │   │
 │  │ • Tokens     │    │ • Gaps       │    │ • Cites [SOURCE N]    │   │
-│  │ • Grounding  │    │              │    │ • Drafts full report  │   │
+│  │ • Citations  │    │              │    │ • Drafts full report  │   │
 │  └──────────────┘    └──────────────┘    └───────────────────────┘   │
 │                                                                      │
 │  OUTPUT: report + critic feedback + sources + evaluation + metrics   │
@@ -91,7 +92,7 @@ researchmind/
 │   ├── agents.py               # 🤖 Lazy Gemini model, agents and chains
 │   ├── rag.py                  # 🧩 ChromaDB vector RAG layer
 │   ├── tools.py                # 🔧 Tavily search, BeautifulSoup scraping
-│   └── evaluation.py           # ✅ Evaluation, groundedness, telemetry, text utils
+│   └── evaluation.py           # ✅ Evaluation, citation checks, run metrics, text utils
 ├── benchmarks/                 # 📈 Benchmark harness + measured results
 │   ├── benchmark.py
 │   └── token_benchmark.json
@@ -109,14 +110,14 @@ researchmind/
 |------|---------|
 | **app.py** | Streamlit app with metrics row, live pipeline status, sources, retrieved chunks, and report download |
 | **api.py** | FastAPI service exposing `POST /research` and `GET /health`, with merged Pydantic schemas |
-| **src/pipeline.py** | `run_research_pipeline(topic)` — orchestrates all stages, RAG, evaluation, telemetry |
+| **src/pipeline.py** | `run_research_pipeline(topic)` — orchestrates all stages, RAG, evaluation, and run metrics |
 | **src/agents.py** | Lazy Gemini model, Search/Reader agents, Writer/Critic chains |
 | **src/rag.py** | Recursive chunking, Gemini/HuggingFace embeddings, ephemeral ChromaDB, diversified top-k retrieval |
 | **src/tools.py** | `web_search(query)` via Tavily, `scrape_url(url)` via BeautifulSoup, concurrent page scraping |
-| **src/evaluation.py** | Critic score parsing, groundedness/citation checks, token accounting, JSONL telemetry, content normalization |
-| **benchmarks/benchmark.py** | Offline token benchmark and full-pipeline latency/quality benchmark |
+| **src/evaluation.py** | Critic score parsing, structural citation checks, token accounting, JSONL run logs, content normalization |
+| **benchmarks/benchmark.py** | Offline token benchmark and full-pipeline latency/evaluation benchmark |
 | **Dockerfile** | Non-root API image with healthcheck |
-| **requirements.txt** | Core dependencies; optional local embedding packages are commented at the bottom |
+| **requirements.txt** | Python dependencies; optional local embedding packages are commented at the bottom |
 
 ---
 
@@ -174,7 +175,7 @@ RAG_TOP_K=5
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GOOGLE_API_KEY` | ✅ Yes | Google API key for Gemini LLM inference (gemini-3.1-flash-lite) and embeddings |
+| `GOOGLE_API_KEY` | ✅ Yes | Google API key for Gemini LLM inference (gemini-3.5-flash-lite) and embeddings |
 | `TAVILY_API_KEY` | ✅ Yes | Tavily API key for web search |
 | `EMBEDDING_PROVIDER` | No | `gemini` (default) or `huggingface` for local/free embeddings |
 | `GEMINI_EMBEDDING_MODEL` | No | Defaults to `models/gemini-embedding-001` |
@@ -227,8 +228,8 @@ print(result["feedback"])         # Critic feedback with score
 # New RAG + evaluation outputs
 print(result["sources"])          # Scraped source metadata (URL, title, chars)
 print(result["retrieved_chunks"]) # Top-k ChromaDB chunks with relevance
-print(result["metrics"])          # Latency, token savings, quality metrics
-print(result["evaluation"])       # Critic score + groundedness / citation check
+print(result["metrics"])          # Latency, token savings, evaluation metrics
+print(result["evaluation"])       # Critic score + structural citation check
 ```
 
 ### Option 4: FastAPI Backend
@@ -276,7 +277,7 @@ docker run --rm -p 8501:8501 --env-file .env researchmind-api \
 1. Enter a topic: `"LLM agents 2026"`, `"CRISPR gene editing"`, `"Fusion energy progress"`
 2. Click **⚡ Run Research Pipeline**
 3. Watch the live stage log (search, scraping, ChromaDB indexing, writer, critic)
-4. Review the metrics row: latency, token reduction, critic score, groundedness, chunks
+4. Review the metrics row: latency, token reduction, critic score, citation checks, chunks
 5. Inspect retrieved evidence and sources in the expanders
 6. Read the final report + critic feedback
 7. Download the report as `.md` or metrics as `.json`
@@ -398,6 +399,7 @@ The project includes a complete dev container setup:
 ### Tests
 
 ```bash
+pip install pytest httpx
 python -m pytest tests -q
 ```
 
@@ -414,13 +416,12 @@ The suite is fully offline: fake embeddings exercise real ChromaDB chunking/retr
 
 ## 📦 Dependencies
 
-### Core (requirements.txt)
+### Main dependencies (see `requirements.txt` for the full list)
 
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `langchain` | ≥1.4.0 | Agent orchestration framework |
 | `langchain-core` | ≥1.6.0 | Core LangChain abstractions |
-| `langchain-community` | ≥0.4.0 | Community integrations |
 | `langchain-google-genai` | ≥4.4.0 | Google Gemini LLM + embeddings |
 | `langchain-chroma` | ≥1.1.0 | Chroma vector store integration |
 | `langchain-text-splitters` | ≥1.0.0 | Recursive chunking |
@@ -432,11 +433,8 @@ The suite is fully offline: fake embeddings exercise real ChromaDB chunking/retr
 | `tavily-python` | ≥0.8.0 | Web search API client |
 | `beautifulsoup4` | ≥4.14.0 | HTML parsing for scraping |
 | `requests` | ≥2.32.0 | HTTP requests |
-| `lxml` | ≥6.1.0 | Fast XML/HTML parser |
 | `python-dotenv` | ≥1.0.0 | Environment variable loading |
-| `rich` | ≥15.0.0 | Rich terminal output (CLI) |
 | `pydantic` | ≥2.13.0 | Data validation / API schemas |
-| `tenacity` | ≥9.1.0 | Retry logic for API calls |
 
 ### Optional local embeddings (commented in `requirements.txt`)
 
@@ -453,7 +451,7 @@ The suite is fully offline: fake embeddings exercise real ChromaDB chunking/retr
 1. Go to [ai.google.dev](https://ai.google.dev)
 2. Sign up / log in
 3. Create API Key
-4. Model used: `gemini-3.1-flash-lite` (fast, cost-effective)
+4. Model used: `gemini-3.5-flash-lite` (fast, cost-effective)
 
 ### Tavily API Key
 1. Go to [tavily.com](https://tavily.com)
