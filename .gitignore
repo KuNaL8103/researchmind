@@ -10,3 +10,4 @@ logs/
 *.md
 !README.md
 .coverage
+project-visualizer/
